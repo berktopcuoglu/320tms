@@ -1,0 +1,43 @@
+İki çalışma modu: Ana ve Bağımlı
+• Baud hızı: 125 farklı programlanabilir hız. Kullanılabilecek maksimum baud hızı, SPI pinlerinde kullanılan G/Ç tamponlarının maksimum hızıyla sınırlıdır. Daha fazla bilgi için cihaz veri sayfasına bakın.
+• Veri kelime uzunluğu: 1 ila 16 veri biti
+• Dört saatleşme şeması (saat polaritesi ve saat fazı bitleri tarafından kontrol edilir) şunları içerir:
+– Faz gecikmesi olmayan düşen kenar: SPICLK aktif-yüksek. SPI, SPICLK sinyalinin düşen kenarında veri iletir ve SPICLK sinyalinin yükselen kenarında veri alır.
+– Faz gecikmeli düşen kenar: SPICLK aktif-yüksek. SPI, SPICLK sinyalinin düşen kenarından bir yarım döngü önce veri iletir ve SPICLK sinyalinin düşen kenarında veri alır.
+– Faz gecikmesi olmayan yükselen kenar: SPICLK inaktif-düşük. SPI, SPICLK sinyalinin yükselen kenarından veri iletir ve SPICLK sinyalinin düşen kenarından veri alır.
+– Faz gecikmeli yükselen kenar: SPICLK inaktif-düşük. SPI, SPICLK sinyalinin yükselen kenarından bir yarım döngü önce veri iletir ve SPICLK sinyalinin yükselen kenarından veri alır.
+• Eşzamanlı alma ve gönderme işlemi (gönderme işlevi yazılımda devre dışı bırakılabilir)
+• Verici ve alıcı işlemleri, kesmeli veya yoklamalı algoritma ile gerçekleştirilir.
+• 16 seviyeli gönderme/alma FIFO'su
+• DMA desteği
+• Yüksek hızlı mod
+• Gecikmeli gönderme kontrolü
+• 3 kablolu SPI modu
+• İki SPI modüllü cihazlarda dijital ses arabirimi alma modu için SPISTE ters çevirme
+SPIINT/SPIRXINT ve SPITXINT.
+SPI, FIFO dışı modda çalışırken SPITXINT kesmesi kullanılamaz.
+
+SPI, FIFO dışı modda çalışırken, mevcut tüm kesmeler tek bir SPIINT kesmesi oluşturmak için birlikte yönlendirilir.
+FIFO modu kullanıldığında ise hem SPIRXINT hem de SPITXINT oluşturulabilir.
+
+SPIINT/SPIRXINT
+SPI, FIFO dışı modda çalışırken, üretilen kesmeye SPIINT adı verilir. 
+FIFO geliştirmeleri etkinleştirilirse, kesmeye SPIRXINT adı verilir. 
+Bu kesmeler, Çevresel Kesme Genişletme (PIE) bloğunda aynı kesme vektörünü paylaşır.
+FIFO dışı modda, iki koşul bir kesintiyi tetikleyebilir: iletim tamamlanmıştır (INT_FLAG) veya alıcıda taşma vardır (OVERRUN_FLAG). Bu koşulların her ikisi de aynı kesme vektörünü paylaşır: SPIINT.
+
+İletim tamamlandı bayrağı (INT_FLAG), SPI'nin son biti göndermeyi veya almayı tamamladığını ve hizmete hazır olduğunu gösterir. 
+Bu bit ayarlandığında, alınan karakter alıcı tamponuna (SPIRXBUF) yerleştirilir. 
+SPIINTENA biti ayarlanmışsa, INT_FLAG, SPIINT vektöründe bir kesme oluşturur.
+
+Alıcı taşma bayrağı (OVERRUN_FLAG), bir iletim veya alma işleminin, önceki karakter tampondan okunmadan önce tamamlandığını gösterir.
+OVERRUN_FLAG, OVERRUNINTENA biti ayarlanmışsa ve OVERRUN_FLAG daha önce temizlenmişse, SPIINT vektöründe bir kesinti oluşturur.
+FIFO modunda, SPI, mevcut alım FIFO durumu (RXFFST) ile alım FIFO kesme seviyesi (RXFFIL) arasında bir eşleşme koşulu olması durumunda CPU'yu kesintiye uğratabilir.
+RXFFST, RXFFIL'den büyük veya ona eşitse, alım FIFO kesme bayrağı (RXFFINT) ayarlanır. 
+RXFFINT ayarlanmışsa ve alım FIFO kesmesi etkinleştirilmişse (RXFFIENA = 1), PIE bloğunda SPIRXINT tetiklenir.
+
+FIFO modunda SPITXINT davranışı SPIRXINT'e benzerdir.
+
+SPITXINT, mevcut iletim FIFO durumu (TXFFST) ile iletim FIFO kesme seviyesi (TXFFIL) arasında bir eşleşme koşulu olduğunda oluşturulur.
+TXFFST, TXFFIL'den küçük veya ona eşitse, iletim FIFO kesme bayrağı (TXFFINT) ayarlanır.
+TXFFINT ayarlanmışsa ve SPI modülünde iletim FIFO kesmesi etkinleştirilmişse (TXFFIENA = 1), PIE bloğunda SPITXINT tetiklenir.
