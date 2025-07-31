@@ -1,0 +1,342 @@
+#include "F28x_Project.h"
+#include "device.h"
+#include "drv8301.h"
+#include "driverlib.h"
+#include "gpio.h"
+
+#include "F2837xD_device.h"
+#include "spi.h"
+
+
+#define DRV_CS_GPIO  61
+#define DRV_CS_LOW()  GPIO_writePin(DRV_CS_GPIO, 0)
+#define DRV_CS_HIGH() GPIO_writePin(DRV_CS_GPIO, 1)
+
+uint16_t status1=0;
+uint16_t status2 =0;
+
+// SPI Frame oluşturma: RW, Adres, Data
+Uint16 DRV8301_build_cmd(Uint16 rw, Uint16 addr, Uint16 data) {
+    return ( (rw & 0x1) << 15 ) | ((addr & 0xF) << 11) | (data & 0x7FF);
+}
+
+// SPI gönder-al (16 bit)
+Uint16 SPI_send(Uint16 data) {
+    while(SpiaRegs.SPISTS.bit.BUFFULL_FLAG); // TX boşalana kadar bekle
+    SpiaRegs.SPITXBUF = data << 0;           // Veri gönder
+    while(SpiaRegs.SPISTS.bit.INT_FLAG == 0); // RX hazır olana kadar bekle
+    return SpiaRegs.SPIRXBUF;                // Gelen cevabı oku
+}
+
+/*
+// === SPI üzerinden 16-bit gönder/al ===
+uint16_t SPI_send(uint16_t data)
+{
+    SPI_writeDataBlockingNonFIFO(SPIA_BASE, data);
+    return SPI_readDataBlockingNonFIFO(SPIA_BASE);
+}*/
+
+// === DRV8301 Register yazma ===
+void DRV8301_write(uint16_t addr, uint16_t data)
+{
+    DRV_CS_LOW();
+    SPI_send(DRV8301_build_cmd(0, addr, data));
+    DRV_CS_HIGH();
+}
+
+// === DRV8301 Register okuma ===
+uint16_t DRV8301_read(uint16_t addr)
+{
+    uint16_t temp;
+    DRV_CS_LOW();
+    SPI_send(DRV8301_build_cmd(1, addr, 0));
+    DRV_CS_HIGH();
+ //   DELAY_US(5);
+    // Cevap bir sonraki frame'de gelir
+    DRV_CS_LOW();
+    temp = SPI_send(0x0000);
+    DRV_CS_HIGH();
+    return temp & 0x7FF;
+}
+
+// === SPI ve GPIO ayarları ===
+void SPI_GPIO_init(void)
+{
+    EALLOW;
+    GPIO_setPinConfig(GPIO_58_SPISIMOA);
+    GPIO_setPinConfig(GPIO_59_SPISOMIA);
+    GPIO_setPinConfig(GPIO_60_SPICLKA);
+
+    // Chip Select pini manuel GPIO
+    GPIO_setPinConfig(GPIO_61_GPIO61);
+    GPIO_setDirectionMode(DRV_CS_GPIO, GPIO_DIR_MODE_OUT);
+    GPIO_writePin(DRV_CS_GPIO, 1);  // Idle = High
+    EDIS;
+}
+
+void spi_init(void)
+{
+    // SPIA modülü init
+    SPI_disableModule(SPIA_BASE);
+
+    SPI_setConfig(SPIA_BASE, DEVICE_LSPCLK_FREQ,SPI_PROT_POL0PHA0, SPI_MODE_MASTER, 1000000, 16);
+ //   SPI_disableFIFO(SPIA_BASE);
+ //   SPI_enableLoopback(SPIA_BASE);
+   // SPI_setEmulationMode(SPIA_BASE, SPI_EMULATION_STOP_AFTER_TRANSMIT);
+    SPI_enableModule(SPIA_BASE);
+}
+
+// === Main ===
+void main(void)
+{
+    Device_init();
+    Device_initGPIO();
+    DINT;
+
+    SPI_GPIO_init();
+    spi_init();
+
+
+    DELAY_US(1);
+
+//    status1 = DRV8301_read(0x00);
+ //    status2 = DRV8301_read(0x01);
+
+    // Örnek: Control1 register ayarı
+   // DRV8301_write(0x02, 0x03A);
+
+    while(1){
+        status1 = DRV8301_read(0x00);
+     //   DRV8301_write(0x02, 0x03A);
+     //   status2 = DRV8301_read(0x01);
+
+//        DRV8301_write(0x02, 0x03A);
+        DELAY_US(1000);
+    }
+}
+/*
+// DriverLib assert hatası için handler
+void __error__(const char *filename, uint32_t line)
+{
+    ESTOP0;
+}
+
+
+
+/*
+// SPI Frame oluşturma: RW, Adres, Data
+Uint16 DRV8301_build_cmd(Uint16 rw, Uint16 addr, Uint16 data) {
+    return ( (rw & 0x1) << 15 ) | ((addr & 0xF) << 11) | (data & 0x7FF);
+}
+
+// SPI gönder-al (16 bit)
+Uint16 SPI_send(Uint16 data) {
+    while(SpiaRegs.SPISTS.bit.BUFFULL_FLAG); // TX boşalana kadar bekle
+    SpiaRegs.SPITXBUF = data << 0;           // Veri gönder
+    while(SpiaRegs.SPISTS.bit.INT_FLAG == 0); // RX hazır olana kadar bekle
+    return SpiaRegs.SPIRXBUF;                // Gelen cevabı oku
+}
+
+// Register yazma
+void DRV8301_write(Uint16 addr, Uint16 data) {
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
+    SPI_send(DRV8301_build_cmd(0, addr, data));
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;
+}
+
+// Register okuma
+Uint16 DRV8301_read(Uint16 addr) {
+    Uint16 temp;
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
+    SPI_send(DRV8301_build_cmd(1, addr, 0));
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;
+
+    // DRV8301 cevabı bir sonraki SPI frame’inde gelir:
+    GpioDataRegs.GPBSET.bit.GPIO61 = 0;
+    temp = SPI_send(0x0000);
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;
+    return temp & 0x7FF; // 11 bit data
+}
+
+void SPI_init(void) {
+    EALLOW;
+
+    // === SPIA Pinleri ===
+    GpioCtrlRegs.GPBMUX2.bit.GPIO58 = 1;   // 1: SPISIMO
+    GpioCtrlRegs.GPBMUX2.bit.GPIO59 = 1;   // 1: SPISOMI
+    GpioCtrlRegs.GPBMUX2.bit.GPIO60 = 1;   // 1: SPICLKA
+
+    // === Chip Select (manuel kontrol için GPIO) ===
+    GpioCtrlRegs.GPBMUX2.bit.GPIO61 = 0;   // 0: GPIO
+    GpioCtrlRegs.GPBDIR.bit.GPIO61 = 1;    // Çıkış
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;    // Başlangıçta HIGH (CS inaktif)
+
+    GpioCtrlRegs.GPAMUX2.bit.GPIO31 = 0;
+    GpioCtrlRegs.GPADIR.bit.GPIO31 = 1;
+    // SPIA Config
+    SpiaRegs.SPICCR.bit.SPISWRESET = 0;   // Reset
+    SpiaRegs.SPICCR.bit.CLKPOLARITY = 0;  // Polarity
+    SpiaRegs.SPICCR.bit.SPICHAR = 0xF;    // 16-bit
+    SpiaRegs.SPICTL.bit.CLK_PHASE = 1;    // Phase
+    SpiaRegs.SPICTL.bit.MASTER_SLAVE = 1; // Master
+    SpiaRegs.SPICTL.bit.TALK = 1;
+    SpiaRegs.SPIBRR.all = 0x39;                 // Baud = LSPCLK/(SPIBRR+1) (ör. 50MHz/50 ~1MHz)
+    SpiaRegs.SPICCR.bit.SPISWRESET = 1;   // Enable
+    EDIS;
+}
+
+void main(void) {
+
+    InitSysCtrl();
+      InitGpio();
+
+    SPI_init();
+
+    DELAY_US(1000);
+
+    // Örnek: Status register 1 oku
+ //   Uint16 status1 = DRV8301_read(0x00);
+ //   Uint16 status2 = DRV8301_read(0x01);
+
+    // Örnek: Control1 register yaz (örneğin shunt gain = 40 V/V)
+    DRV8301_write(0x02, 0x03A);  // Control1: Gain = 40, OcAdj = default
+    for(;;){
+        if((SpiaRegs.SPISTS.bit.INT_FLAG) == 0){
+            GpioDataRegs.GPACLEAR.bit.GPIO31 = 1;
+
+            Uint16 status1 = DRV8301_read(0x00);
+                    DELAY_US(100);
+        }
+        else
+        {
+            GpioDataRegs.GPASET.bit.GPIO31 = 1;
+        }
+
+         // Uint16 status2 = DRV8301_read(0x01);
+       //   DELAY_US(100);
+
+    }
+}
+
+
+/*
+void main(void)
+{
+    InitSysCtrl();
+    InitGpio();
+
+    EALLOW;
+    GpioCtrlRegs.GPAMUX2.bit.GPIO31 = 0;
+    GpioCtrlRegs.GPADIR.bit.GPIO31 = 1;
+    GpioCtrlRegs.GPBMUX1.bit.GPIO34 = 0;
+    GpioCtrlRegs.GPBDIR.bit.GPIO34 = 1;
+    EDIS;
+
+    while(1){
+          GpioDataRegs.GPBSET.bit.GPIO34 = 1;
+          DELAY_US(50000);
+          GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;
+          DELAY_US(50000);
+          GpioDataRegs.GPASET.bit.GPIO31 = 1;
+          DELAY_US(50000);
+          GpioDataRegs.GPACLEAR.bit.GPIO31 =1;
+          DELAY_US(50000);
+    }
+
+}
+ /*   DRV8301_init();
+
+    // Önce Status1 register'ı oku (güç geldi mi gör)
+    uint16_t status1 = DRV8301_readSpi(DRV8301_Reg_Status1);
+
+    // Control1 register'a test değeri yaz (örnek: 0x05A)
+    uint16_t testValue = 0x05A;  // 11-bitlik rastgele değer
+    DRV8301_writeSpi(DRV8301_Reg_Control1, testValue);
+
+    // Geri oku
+ //   uint16_t readBack = DRV8301_readSpi(DRV8301_Reg_Control1);
+
+    // Debug: Eğer readBack == testValue ise SPI çalışıyor
+    for(;;)
+    {
+        GpioDataRegs.GPBSET.bit.GPIO34 = 1;
+        DELAY_US(500000);
+        GpioDataRegs.GPBCLEAR.bit.GPIO34 = 1;
+        DELAY_US(500000);
+ /*       if(readBack == testValue)
+        {
+  //          GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;  // Test için: LED blink
+            GpioDataRegs.GPASET.bit.GPIO31 = 1;
+            DELAY_US(500000);
+            GpioDataRegs.GPACLEAR.bit.GPIO31 = 1;
+            DELAY_US(500000);
+        }
+        else{
+
+        }
+
+
+    }
+}
+
+#include "F28x_Project.h"
+
+#define DRV8301_CS_LOW    GpioDataRegs.GPACLEAR.bit.GPIO19 = 1
+#define DRV8301_CS_HIGH   GpioDataRegs.GPASET.bit.GPIO19 = 1
+
+// --- DRV8301 register addresses ---
+#define DRV8301_STATUS1   0x00
+#define DRV8301_STATUS2   0x01
+#define DRV8301_CONTROL1  0x02
+#define DRV8301_CONTROL2  0x03
+
+// --- SPI functions ---
+void SPIA_Init(void);
+Uint16 DRV8301_ReadReg(Uint16 address);
+
+void main(void)
+{
+    InitSysCtrl();
+    InitGpio();
+
+    // SPIA GPIOs
+    GPIO_SetupPinMux(16, GPIO_MUX_CPU1, 1);  // SPISIMOA
+    GPIO_SetupPinMux(17, GPIO_MUX_CPU1, 1);  // SPISOMIA
+    GPIO_SetupPinMux(18, GPIO_MUX_CPU1, 1);  // SPICLKA
+    GPIO_SetupPinMux(19, GPIO_MUX_CPU1, 0);  // Manual CS
+    GPIO_SetupPinOptions(19, GPIO_OUTPUT, GPIO_PUSHPULL);
+
+    SPIA_Init();
+
+    DRV8301_CS_HIGH;
+
+    // --- Read registers ---
+    Uint16 status1 = DRV8301_ReadReg(DRV8301_STATUS1);
+    Uint16 status2 = DRV8301_ReadReg(DRV8301_STATUS2);
+    Uint16 control1 = DRV8301_ReadReg(DRV8301_CONTROL1);
+    Uint16 control2 = DRV8301_ReadReg(DRV8301_CONTROL2);
+
+    // Debug: break here or send via SCI
+    asm(" ESTOP0");
+}
+
+void SPIA_Init(void)
+{
+    SpiaRegs.SPICCR.all = 0x0007;     // Reset, 16-bit, no loopback
+    SpiaRegs.SPICTL.all = 0x0006;     // Master mode, enable TX/RX
+    SpiaRegs.SPIBRR.all = 0x007F;         // Baud rate
+    SpiaRegs.SPICCR.all = 0x0087;     // Release from reset
+    SpiaRegs.SPIPRI.bit.FREE = 1;     // Free run on emulation halt
+}
+
+Uint16 DRV8301_ReadReg(Uint16 address)
+{
+    Uint16 cmd = 0x8000 | ((address & 0x3F) << 11); // Read cmd (bit15=1)
+    DRV8301_CS_LOW;
+    SpiaRegs.SPITXBUF = cmd;
+    while(SpiaRegs.SPISTS.bit.INT_FLAG == 0);
+    Uint16 result = SpiaRegs.SPIRXBUF;
+    DRV8301_CS_HIGH;
+    return (result & 0x07FF); // Only lower 11 bits are valid data
+}
+*/
