@@ -1,0 +1,107 @@
+#include "driverlib.h"
+#include "device.h"
+
+#define DRV8301_CS_GPIO 61
+
+uint16_t status0 =0;
+uint16_t status1 =0;
+uint16_t status2 =0;
+uint16_t status3 =0;
+
+// ---- Chip Select kontrolü ----
+static inline void DRV8301_CS_Low(void)  { GPIO_writePin(DRV8301_CS_GPIO, 0); }
+static inline void DRV8301_CS_High(void) { GPIO_writePin(DRV8301_CS_GPIO, 1); }
+
+// ---- DRV8301 komut çerçevesi oluşturma ----
+uint16_t DRV8301_build_cmd(uint16_t rw, uint16_t addr, uint16_t data)
+{
+    return ((rw & 0x1) << 15) | ((addr & 0xF) << 11) | (data & 0x7FF);
+}
+
+// ---- SPI transfer (16 bit) ----
+uint16_t SPI_transfer16(uint16_t data)
+{
+    // Yaz (blocking)
+    SPI_writeDataBlockingNonFIFO(SPIA_BASE, data);
+    // Oku
+    return SPI_readDataBlockingNonFIFO(SPIA_BASE);
+}
+
+// ---- DRV8301 register yaz ----
+void DRV8301_write(uint16_t addr, uint16_t data)
+{
+    DRV8301_CS_Low();
+    SPI_transfer16(DRV8301_build_cmd(0, addr, data));
+    DRV8301_CS_High();
+}
+
+// ---- DRV8301 register oku ----
+uint16_t DRV8301_read(uint16_t addr)
+{
+    uint16_t val;
+    DRV8301_CS_Low();
+    SPI_transfer16(DRV8301_build_cmd(1, addr, 0)); // okuma isteği
+    DRV8301_CS_High();
+
+    DRV8301_CS_Low();
+    val = SPI_transfer16(0x0000); // cevabı almak için dummy frame
+    DRV8301_CS_High();
+    return val & 0x7FF;
+}
+
+// ---- SPIA başlat ----
+void initSPIA(void)
+{
+    // SPI GPIO'ları
+    GPIO_setPinConfig(GPIO_58_SPISIMOA);
+    GPIO_setPinConfig(GPIO_59_SPISOMIA);
+    GPIO_setPinConfig(GPIO_60_SPICLKA);
+    GPIO_setPinConfig(GPIO_61_GPIO61);   // CS manuel kontrol
+    GPIO_setDirectionMode(DRV8301_CS_GPIO, GPIO_DIR_MODE_OUT);
+    DRV8301_CS_High();
+
+    // EN_GATE pinini yüksek çekmek
+        GPIO_setPinConfig(GPIO_124_GPIO124); // EN_GATE pini
+        GPIO_setDirectionMode(124, GPIO_DIR_MODE_OUT);
+        GPIO_writePin(124, 1); // DRV8301'i etkinleştirir
+
+    // SPI ayarları
+    SPI_disableModule(SPIA_BASE);
+    SPI_setConfig(SPIA_BASE, DEVICE_LSPCLK_FREQ,
+                  SPI_PROT_POL0PHA0,  // Mode1 (CPOL=0, CPHA=0)
+                  SPI_MODE_MASTER,
+                  1000000,            // 1 MHz
+                  16);                // 16-bit frame
+    SPI_disableLoopback(SPIA_BASE);
+    SPI_setEmulationMode(SPIA_BASE, SPI_EMULATION_FREE_RUN);
+    SPI_enableModule(SPIA_BASE);
+}
+
+void main(void)
+{
+    // Cihaz başlat
+    Device_init();
+    Device_initGPIO();
+
+    // SPI başlat
+    initSPIA();
+
+    DEVICE_DELAY_US(1000);
+DRV8301_write(0x02, 0x452);
+while(1)
+    {
+ //       status0 = DRV8301_read(0x00);
+   //     DEVICE_DELAY_US(20000);
+ //       status1 = DRV8301_read(0x01);
+        DEVICE_DELAY_US(20000);
+        status2 = DRV8301_read(0x02);
+   //     DEVICE_DELAY_US(20000);
+   //     status3 = DRV8301_read(0x03);
+      //  DEVICE_DELAY_US(20000);
+
+    //    status1 = DRV8301_read(0x02);
+    //    DEVICE_DELAY_US(200000);
+ //      status1 = DRV8301_read(0x01);
+ //       DEVICE_DELAY_US(100000);
+    }
+}
