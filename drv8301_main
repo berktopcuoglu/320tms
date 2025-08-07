@@ -1,0 +1,86 @@
+#include "driverlib.h"
+#include "device.h"
+#include "drv8301.h"
+
+#define DRV8301_nOCTW_GPIO      18
+#define DRV8301_nFAULT_GPIO     19
+#define DRV8301_nSCS_GPIO       61
+#define DRV8301_EN_GATE_GPIO    124
+
+DRV8301_Handle drv8301;
+
+uint16_t state=0;
+
+void main(void)
+{
+    // Cihaz başlat
+    Device_init();
+    Device_initGPIO();
+
+    // SPI GPIO'ları
+    GPIO_setPinConfig(GPIO_58_SPISIMOA);
+    GPIO_setPinConfig(GPIO_59_SPISOMIA);
+    GPIO_setPinConfig(GPIO_60_SPICLKA);
+    GPIO_setPinConfig(GPIO_61_GPIO61);   // CS manuel kontrol
+
+    // SPI ayarları
+    SPI_disableModule(SPIA_BASE);
+    SPI_setConfig(SPIA_BASE,
+                  DEVICE_LSPCLK_FREQ,
+                  SPI_PROT_POL0PHA0,  // Mode1 (CPOL=0, CPHA=0)
+                  SPI_MODE_MASTER,
+                  1000000,            // 1 MHz
+                  16);                // 16-bit frame
+    SPI_disableLoopback(SPIA_BASE);
+    SPI_setEmulationMode(SPIA_BASE, SPI_EMULATION_FREE_RUN);
+    SPI_enableModule(SPIA_BASE);
+
+
+    DRV8301_init(&drv8301,
+                 SPIA_BASE,
+                 DRV8301_nSCS_GPIO,
+                 DRV8301_nFAULT_GPIO,
+                 DRV8301_EN_GATE_GPIO,
+                 DRV8301_nOCTW_GPIO);
+
+    DEVICE_DELAY_US(1000);
+
+    DRV8301_configure_1(&drv8301, GATE_PEAK_0_25A,
+                        DRV8301_NORMAL_MODE,
+                        PWM_3,
+                        DRV8301_OC_REPORT_ONLY);
+    DEVICE_DELAY_US(1000);
+    DRV8301_configure_2(&drv8301, DRV8301_nOCTW_Enable,
+                        DRV8301_GAIN_40,
+                        DRV8301_DC_CAL_CH1_CONNECT,
+                        DRV8301_DC_CAL_CH2_CONNECT,
+                        DRV8301_CYCLE_BY_CYLE);
+    while(1)
+    {
+ //       switch (state){
+ //       case(0):
+//        {
+            if(!DRV8301_isFaultActive(&drv8301))
+            {
+               // DRV8301_clearFault(&drv8301);
+            }
+            else
+            {
+                DRV8301_updateStatus(&drv8301);
+                DEVICE_DELAY_US(1000);
+            }
+/*        break;
+        }
+
+        case(1):
+        {
+//            DEVICE_DELAY_US(20000);
+        }
+        break;
+        default:
+        break;
+        }
+*/
+    }
+
+}
