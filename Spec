@@ -1,0 +1,34 @@
+#elif (USER_MOTOR == Teknic_M2310PLN04K)
+#define USER_MOTOR_TYPE                 MOTOR_Type_Pm 
+#define USER_MOTOR_NUM_POLE_PAIRS       (4)                
+#define USER_MOTOR_Rr                   (NULL) 
+#define USER_MOTOR_Rs                   (0.4076258) 
+#define USER_MOTOR_Ls_d                 (0.0001972132) 
+#define USER_MOTOR_Ls_q                 (0.0001972132) 
+#define USER_MOTOR_RATED_FLUX           (0.03975862) 
+#define USER_MOTOR_MAGNETIZING_CURRENT  (NULL) 
+#define USER_MOTOR_RES_EST_CURRENT      (1.0) 
+#define USER_MOTOR_IND_EST_CURRENT      (-0.5) 
+#define USER_MOTOR_MAX_CURRENT          (7.0) 
+#define USER_MOTOR_FLUX_EST_FREQ_Hz     (20.0) 
+// Number of lines on the motor's quadrature encoder 
+#define USER_MOTOR_ENCODER_LINES        (1000.0)
+
+/************************************************************/
+/******************************J14***************************/
+// EQEP1A 
+GPIO_setMode(obj->gpioHandle,GPIO_Number_20,GPIO_20_Mode_EQEP1A);
+// EQEP1B 
+GPIO_setMode(obj->gpioHandle,GPIO_Number_21,GPIO_21_Mode_EQEP1B);
+//EQEP1I 
+GPIO_setMode(obj->gpioHandle,GPIO_Number_99,GPIO_99_Mode_EQEP1I);
+
+/************************************************************/
+/******************************J15***************************/
+// EQEP2A 
+GPIO_setMode(obj->gpioHandle,GPIO_Number_54,GPIO_54_Mode_EQEP2A);
+// EQEP2B 
+GPIO_setMode(obj->gpioHandle,GPIO_Number_55,GPIO_55_Mode_EQEP2B);
+//EQEP2I 
+GPIO_setMode(obj->gpioHandle,GPIO_Number_57,GPIO_57_Mode_EQEP2I);
+/************************************************************/
