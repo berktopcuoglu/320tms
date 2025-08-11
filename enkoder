@@ -1,0 +1,82 @@
+#include "F28x_Project.h"
+#include "driverlib.h"
+#include "device.h"
+
+// eQEP'den okunan pozisyon ve hız değerleri için global değişkenler
+int32_t position = 0;
+int32_t old_position = 0;
+int32_t delta_position = 0;
+float speed_rpm = 0.0;
+
+// Encoder çözünürlüğü (örnek: 1000 CPR = 4000 count / tur (x4 modunda))
+#define ENCODER_CPR     1000
+#define ENCODER_COUNTS  (ENCODER_CPR * 4)
+
+// Hız ölçüm periyodu (ms)
+#define SPEED_SAMPLE_MS 10
+
+void initEQEP1(void)
+{
+    //
+    // EQEP1 Pin konfigürasyonu
+    //
+    GPIO_setPinConfig(GPIO_20_EQEP1A);
+    GPIO_setPinConfig(GPIO_21_EQEP1B);
+    GPIO_setPinConfig(GPIO_99_EQEP1I);
+
+    GPIO_setDirectionMode(20, GPIO_DIR_MODE_IN);
+    GPIO_setDirectionMode(21, GPIO_DIR_MODE_IN);
+    GPIO_setDirectionMode(99, GPIO_DIR_MODE_IN);
+
+    //
+    // EQEP1 saatini aç
+    //
+    SysCtl_enablePeripheral(SYSCTL_PERIPH_CLK_EQEP1);
+
+    //
+    // Modül konfigürasyonu (Register seviye)
+    //
+    EALLOW;
+    EQep1Regs.QDECCTL.bit.QSRC = 0;     // Quadrature count mode
+    EQep1Regs.QDECCTL.bit.XCR = 0;      // Normal count
+    EQep1Regs.QEPCTL.bit.FREE_SOFT = 2; // Emulation mode: free run
+    EQep1Regs.QEPCTL.bit.PCRM = 0;      // Reset on index
+    EQep1Regs.QEPCTL.bit.QCLM = 1;      // Latch on unit time
+    EQep1Regs.QEPCTL.bit.UTE = 1;       // Enable unit timer
+    EQep1Regs.QPOSMAX = 0xFFFFFFFF;     // Max count
+    EQep1Regs.QEPCTL.bit.QPEN = 1;      // Enable position counter
+    EDIS;
+
+    //
+    // Driverlib ile modülü aktif et
+    //
+    EQEP_enableModule(EQEP1_BASE);
+    EQEP_setPosition(EQEP1_BASE, 0);
+}
+
+int main(void)
+{
+    Device_init();
+    Device_enableAllPeripherals();
+    Device_initGPIO();
+
+    initEQEP1();
+
+    for (;;)
+    {
+        // Pozisyon oku
+        position = EQep1Regs.QPOSCNT;
+
+        // Hız hesapla (basit yöntem: periyodik fark)
+        delta_position = position - old_position;
+        old_position = position;
+
+        // Counts → RPM dönüşümü
+        // delta_position / ENCODER_COUNTS = tur farkı
+        // 1 / (SPEED_SAMPLE_MS/1000) ile çarp → tur/s
+        // Sonra 60 ile çarp → RPM
+        speed_rpm = ((float)delta_position / ENCODER_COUNTS) * (1000.0f / SPEED_SAMPLE_MS) * 60.0f;
+
+        DEVICE_DELAY_US(SPEED_SAMPLE_MS * 1000);
+    }
+}
