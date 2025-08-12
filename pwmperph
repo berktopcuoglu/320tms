@@ -1,0 +1,27 @@
+/*
+ * peripheral.h
+ *
+ *  Created on: 11 Ağu 2025
+ *      Author: Berk
+ */
+
+#ifndef DRIVER_PERIPHERAL_H_
+#define DRIVER_PERIPHERAL_H_
+
+#include "F28x_Project.h"
+#include "driverlib.h"
+#include "device.h"
+
+void Pin_Config(void);
+
+void drv8301_SPI_config(void);
+
+void pwm_init(void);
+void pwm_init_TB(uint32_t base, uint32_t period);
+
+void pwm_init_CC(uint32_t base, uint32_t compare);
+
+void pwm_init_AQ(uint32_t base);
+
+
+#endif /* DRIVER_PERIPHERAL_H_ */
