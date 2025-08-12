@@ -1,0 +1,103 @@
+/*
+ * peripheral.c
+ *
+ *  Created on: 11 Ağu 2025
+ *      Author: Berk
+ */
+#include "peripheral.h"
+
+void Pin_Config(){
+
+ // SPI GPIO'ları
+//    GPIO_setPinConfig(GPIO_58_SPISIMOA);
+//    GPIO_setPinConfig(GPIO_59_SPISOMIA);
+//    GPIO_setPinConfig(GPIO_60_SPICLKA);
+ //   GPIO_setPinConfig(GPIO_61_GPIO61);   // CS manuel kontrol
+
+    // GPIO pinlerini EPWM fonksiyonlarına ayarla (örn. ePWM1A, ePWM2A, ePWM3A)
+    GPIO_setPinConfig(GPIO_0_EPWM1A);
+    GPIO_setPinConfig(GPIO_1_EPWM1B);
+    GPIO_setPinConfig(GPIO_2_EPWM2A);
+    GPIO_setPinConfig(GPIO_3_EPWM2B);
+    GPIO_setPinConfig(GPIO_4_EPWM3A);
+    GPIO_setPinConfig(GPIO_5_EPWM3B);
+
+    GPIO_setDirectionMode(GPIO_0_EPWM1A, GPIO_DIR_MODE_OUT);
+    GPIO_setDirectionMode(GPIO_1_EPWM1B, GPIO_DIR_MODE_OUT);
+    GPIO_setDirectionMode(GPIO_2_EPWM2A, GPIO_DIR_MODE_OUT);
+    GPIO_setDirectionMode(GPIO_3_EPWM2B, GPIO_DIR_MODE_OUT);
+    GPIO_setDirectionMode(GPIO_4_EPWM3A, GPIO_DIR_MODE_OUT);
+    GPIO_setDirectionMode(GPIO_5_EPWM3B, GPIO_DIR_MODE_OUT);
+
+    // GPIO pinlerini EQEP fonksiyonlarına ayarla (örn. eQEP1A, eQEP1B, eQEP1I)
+    GPIO_setPinConfig(GPIO_20_EQEP1A);
+    GPIO_setPinConfig(GPIO_21_EQEP1B);
+    GPIO_setPinConfig(GPIO_99_EQEP1I);
+
+}
+
+void drv8301_SPI_config(void){
+
+    // SPI ayarları
+    SPI_disableModule(SPIA_BASE);
+    SPI_setConfig(SPIA_BASE, DEVICE_LSPCLK_FREQ, SPI_PROT_POL0PHA0, SPI_MODE_MASTER, 1000000, 16);
+    SPI_disableLoopback(SPIA_BASE);
+    SPI_setEmulationMode(SPIA_BASE, SPI_EMULATION_FREE_RUN);
+    SPI_enableModule(SPIA_BASE);
+
+}
+
+void pwm_init(void){
+
+    EALLOW;
+    CpuSysRegs.PCLKCR2.bit.EPWM1 = 1;
+    CpuSysRegs.PCLKCR2.bit.EPWM2 = 1;
+    CpuSysRegs.PCLKCR2.bit.EPWM3 = 1;
+    EDIS;
+
+    SysCtl_enablePeripheral(SYSCTL_PERIPH_CLK_EPWM1);   //CR0
+    SysCtl_enablePeripheral(SYSCTL_PERIPH_CLK_EPWM2);
+    SysCtl_enablePeripheral(SYSCTL_PERIPH_CLK_EPWM3);
+
+    // Stop the timer counters for ePWM
+    SysCtl_disablePeripheral(SYSCTL_PERIPH_CLK_TBCLKSYNC);
+}
+
+void pwm_init_TB(uint32_t base, uint32_t period){
+
+    EPWM_setEmulationMode(base,EPWM_EMULATION_FREE_RUN);
+    EPWM_setClockPrescaler(base, EPWM_CLOCK_DIVIDER_1, EPWM_HSCLOCK_DIVIDER_1);
+    EPWM_setPeriodLoadMode(base,EPWM_PERIOD_SHADOW_LOAD);
+    EPWM_setTimeBaseCounterMode(base, EPWM_COUNTER_MODE_UP_DOWN);
+
+    EPWM_setTimeBasePeriod(base, period);
+
+}
+
+
+void pwm_init_CC(uint32_t base, uint32_t compare){
+    // Başlangıç duty cycle %50 (CMPA = TBPRD / 2)
+    EPWM_setCounterCompareShadowLoadMode(base,EPWM_COUNTER_COMPARE_A, EPWM_COMP_LOAD_ON_CNTR_ZERO);
+    EPWM_setCounterCompareValue(base, EPWM_COUNTER_COMPARE_A, (((-0.03 + 1) / 2.0)*compare));
+}
+
+
+
+
+
+void pwm_init_AQ(uint32_t base){
+    // TBCTR=0 → PWM A high
+    EPWM_setActionQualifierAction(base, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
+    // CMPA (up-count) → PWM A low
+    EPWM_setActionQualifierAction(base, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPA);
+    // CMPA (down-count) → PWM A high
+    EPWM_setActionQualifierAction(base, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPA);
+
+
+    // TBCTR=0 → PWM B low
+    EPWM_setActionQualifierAction(base, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
+    // CMPA (up-count) → PWM B high
+    EPWM_setActionQualifierAction(base, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPA);
+    // CMPA (down-count) → PWM B low
+    EPWM_setActionQualifierAction(base, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPA);
+}
