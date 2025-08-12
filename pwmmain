@@ -1,0 +1,60 @@
+#include "F28x_Project.h"
+#include "driverlib.h"
+#include "device.h"
+#include "peripheral.h"
+#include "drv8301.h"
+
+
+/**
+ * main.c
+ */
+#define DRV8301_nOCTW_GPIO      18
+#define DRV8301_nFAULT_GPIO     19
+#define DRV8301_nSCS_GPIO       61
+#define DRV8301_EN_GATE_GPIO    124
+
+DRV8301_Handle drv8301;
+extern uint16_t state=0;
+
+int main(void)
+{
+
+Device_init();
+
+Device_initGPIO();
+
+Pin_Config();
+
+pwm_init();
+
+pwm_init_TB(EPWM1_BASE, 1250);
+pwm_init_TB(EPWM2_BASE, 1250);
+pwm_init_TB(EPWM3_BASE, 1250);
+
+pwm_init_CC(EPWM1_BASE, 600);
+pwm_init_CC(EPWM2_BASE, 600);
+pwm_init_CC(EPWM3_BASE, 600);
+
+pwm_init_AQ(EPWM1_BASE);
+pwm_init_AQ(EPWM2_BASE);
+pwm_init_AQ(EPWM3_BASE);
+
+//drv8301_SPI_config();
+
+
+//DRV8301_init(&drv8301, SPIA_BASE, DRV8301_nSCS_GPIO, DRV8301_nFAULT_GPIO, DRV8301_EN_GATE_GPIO, DRV8301_nOCTW_GPIO);
+
+//DEVICE_DELAY_US(1000);
+
+//DRV8301_configure_1(&drv8301, GATE_PEAK_0_25A, DRV8301_NORMAL_MODE, PWM_3, DRV8301_OC_REPORT_ONLY);
+//DEVICE_DELAY_US(1000);
+//DRV8301_configure_2(&drv8301, DRV8301_nOCTW_Enable, DRV8301_GAIN_40, DRV8301_DC_CAL_CH1_CONNECT, DRV8301_DC_CAL_CH2_CONNECT, DRV8301_CYCLE_BY_CYLE);
+
+
+
+// EPWM zamanlayıcılarını başlat
+   SysCtl_enablePeripheral(SYSCTL_PERIPH_CLK_TBCLKSYNC);
+
+    while(1){}
+
+}
